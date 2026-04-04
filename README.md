@@ -1,59 +1,93 @@
-# LifeOSFrontend
+Esto es un readme compartido con todos los repositoriso, para poder generar el dockercompose desde cualquier repo
+Docker-compose.yml:
+services:
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.1.3.
+  # ── Base de datos ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: lifeos-db
+    environment:
+      POSTGRES_DB: lifeos_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lifeos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lifeos_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-## Development server
+  # ── Backend (Spring Boot) ────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./Life_OS_backend
+    container_name: lifeos-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/lifeos_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - lifeos-network
+    restart: on-failure
 
-To start a local development server, run:
+  # ── Frontend (Angular + Nginx) ───────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Life_OS_frontend
+    container_name: lifeos-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - lifeos-network
+    restart: on-failure
 
-```bash
-ng serve
-```
+networks:
+  lifeos-network:
+    driver: bridge
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+volumes:
+  postgres_data:
 
-## Code scaffolding
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Makefile:
+.PHONY: up down build rebuild logs ps clean
 
-```bash
-ng generate component component-name
-```
+## Levantar todos los servicios en segundo plano
+up:
+	docker compose up -d
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Detener todos los servicios
+down:
+	docker compose down
 
-```bash
-ng generate --help
-```
+## Construir las imágenes sin levantar los servicios
+build:
+	docker compose build
 
-## Building
+## Reconstruir las imágenes forzando el no uso de caché y levantar
+rebuild:
+	docker compose build --no-cache
+	docker compose up -d
 
-To build the project run:
+## Ver logs en tiempo real de todos los servicios
+logs:
+	docker compose logs -f
 
-```bash
-ng build
-```
+## Ver el estado de los contenedores
+ps:
+	docker compose ps
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Detener contenedores, eliminar volúmenes e imágenes generadas
+clean:
+	docker compose down -v --rmi local

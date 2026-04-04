@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { CategoryService } from '../../services/category';
 
 @Component({
   selector: 'app-category-detail',
@@ -12,12 +13,12 @@ export class CategoryDetail {
   startDate = new Date();
   endDate = new Date();
   categoryId = 0; // EL DATO CLAVE  
-
-  cards: any[] = [];  
+  categories: any[] = [];
+  private categoryService = inject(CategoryService);
 
 
   loadCategories() {
-    this.cards.getMyCategories().subscribe(data => {
+    this.categoryService.getMyCategories().subscribe((data: any[]) => {
       this.categories = data; 
       console.log('Categorías cargadas:', this.categories);
     });
